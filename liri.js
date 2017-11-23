@@ -1,47 +1,79 @@
-const Twitter = require('twitter');
-const Spotify = require('node-spotify-api');
-const keys = require('./keys.js');
-var inquirer = require("inquirer");
-var request = require("request");
-var fs = require('fs');
-
+const Twitter = require("twitter");
+const Spotify = require("node-spotify-api");
+const keys = require("./keys.js");
+const inquirer = require("inquirer");
+const request = require("request");
+const fs = require("fs");
 
 const TwitterAuth = new Twitter(keys.twitterKeys);
 const SpotifyAuth = new Spotify(keys.spotifyKeys);
 
-const command = process.argv[2];
+var liriCommand = process.argv[2];
 
-var params = {
-    screen_name: "krekeltjekip",
-    count: 20
-};
+var params = {};
+var songChoice;
+var movieRes;
 
-//my-tweets command
+// The switch statement will direct which function is run
+switch (liriCommand) {
+    case "my-tweets":
+    case "tweet":
+        myTweets();
+        appendCommand();
+        break;
 
-if (command == "my-tweets") {
-    console.log("Retrieving @krekeltjekip's last 20 tweets!");
+    case "spotify-this-song":
+    case "spotify":
+        spotifyThisSong();
+        appendCommand();
+        break;
 
-    TwitterAuth.get('statuses/user_timeline', params, function (error, tweets, response) {
-        if (!error) {
+    case "movie-this":
+    case "movie":
+        movieThis();
+        appendCommand();
+        break;
 
-            for (i = 0; i < tweets.length; i++) {
-                var individTweet = tweets[i];
-                var text = JSON.stringify(individTweet.text);
-                var timestamp = JSON.stringify(individTweet.created_at + " UTC");
-                var tweetNum = i + 1;
-                console.log("Tweet # " + tweetNum + " of 20 most recent tweets: " +
-                    text + " tweeted on " + timestamp);
-            }
-        } else {
-            console.log('Error occurred: ' + error);
+    case "do-what-it-says":
+    case "do":
+        doWhatItSays();
+        appendCommand();
+        break;
+}
+
+//append to log.txt *bonus*
+function appendCommand() {
+    fs.appendFile("log.txt", liriCommand + "\n", function (err) {
+        if (err) {
+            console.log("Error occurred: " + err);
         }
-
     });
 }
 
-//spotify-this-song command
+//my-tweets liriCommand
+function myTweets() {
+    console.log("Retrieving @krekeltjekip's last 20 tweets!");
+    params = {
+        screen_name: "krekeltjekip",
+        count: 20
+    };
+    TwitterAuth.get("statuses/user_timeline", params, function (err, tweets, response) {
+        if (err) {
+            console.log("Error occurred: " + err);
+        }
+        for (i = 0; i < tweets.length; i++) {
+            var tweetText = JSON.stringify(tweets[i].text);
+            var timestamp = tweets[i].created_at.substring(4, 19) + " UTC";
+            console.log("Tweet #" + (i + 1) + " of 20 most recent tweets: " +
+                tweetText + " tweeted on " + timestamp);
+        }
+    });
+}
 
-if (command == "spotify-this-song") {
+//spotify-this-song liriCommand
+function spotifyThisSong() {
+    console.log("Your wish is my liriCommand!");
+
     inquirer.prompt([{
         type: "input",
         name: "song",
@@ -50,40 +82,41 @@ if (command == "spotify-this-song") {
         var songChoice = question.song;
 
         if (songChoice == "") {
-            SpotifyAuth.search({
-                type: 'track',
-                query: 'The Sign',
+            params = {
+                type: "track",
+                query: "The Sign",
                 limit: 10
-            }, function (error, data) {
-                if (!error) {
-                    console.log("Artist(s): " + data.tracks.items[8].artists[0].name + "\nSong: " +
-                        data.tracks.items[8].name + "\nPreview: " + data.tracks.items[8].external_urls.spotify +
-                        "\nAlbum: " + data.tracks.items[8].album.name);
-                } else {
-                    console.log('Error occurred: ' + error);
+            };
+            SpotifyAuth.search(params, function (err, data) {
+                if (err) {
+                    console.log("Error occurred: " + err);
                 }
+                console.log("Artist(s): " + data.tracks.items[8].artists[0].name + "\nSong: " +
+                    data.tracks.items[8].name + "\nPreview: " + data.tracks.items[8].external_urls.spotify +
+                    "\nAlbum: " + data.tracks.items[8].album.name);
             });
         } else {
-            SpotifyAuth.search({
-                type: 'track',
+            params = {
+                type: "track",
                 query: songChoice,
                 limit: 1
-            }, function (error, data) {
-                if (!error) {
-                    console.log("Artist(s): " + data.tracks.items[0].artists[0].name + "\nSong: " +
-                        data.tracks.items[0].name + "\nPreview: " + data.tracks.items[0].external_urls.spotify +
-                        "\nAlbum: " + data.tracks.items[0].album.name);
-                } else {
-                    console.log('Error occurred: ' + error);
+            };
+            SpotifyAuth.search(params, function (err, data) {
+                if (err) {
+                    console.log("Error occurred: " + err);
                 }
+                console.log("Artist(s): " + data.tracks.items[0].artists[0].name + "\nSong: " +
+                    data.tracks.items[0].name + "\nPreview: " + data.tracks.items[0].external_urls.spotify +
+                    "\nAlbum: " + data.tracks.items[0].album.name);
             });
         }
     });
 }
 
-// movie-this command
+// movie-this liriCommand
+function movieThis() {
+    console.log("Movie info comin right up!");
 
-if (command == "movie-this") {
     inquirer.prompt([{
         type: "input",
         name: "movie",
@@ -94,67 +127,88 @@ if (command == "movie-this") {
         if (movieChoice == "") {
             movieChoice = "Mr.Nobody";
             var movieSearch = "http://www.omdbapi.com/?t=" + movieChoice + "&apikey=40e9cece";
-            console.log(movieSearch);
-            request(movieSearch, function (error, response, body) {
-                if (!error && response.statusCode === 200) {
-
-                    console.log("Title: " + (JSON.parse(body).Title) + "\nYear Released: " +
-                        (JSON.parse(body).Year) + "\nIMDB Rating: " + (JSON.parse(body).imdbRating) +
-                        "\nRotten Tomatoes Rating: " + (JSON.parse(body).Ratings[1].Value) +
-                        "\nCountry Produced: " + JSON.parse(body).Country + "\nLanguage: " +
-                        (JSON.parse(body).Language) + "\nPlot: " + (JSON.parse(body).Plot) +
-                        "\nActors: " + (JSON.parse(body).Actors));
-                } else {
-                    console.log('Error occurred: ' + error);
+            request(movieSearch, function (err, response, body) {
+                if (err || response.statusCode !== 200) {
+                    console.log("Error occurred: " + err);
                 }
+                movieRes = JSON.parse(body);
+                console.log("Title: " + (movieRes.Title) + "\nYear Released: " +
+                    (movieRes.Year) + "\nIMDB Rating: " + (movieRes.imdbRating) +
+                    "\nRotten Tomatoes Rating: " + (movieRes.Ratings[1].Value) +
+                    "\nCountry Produced: " + movieRes.Country + "\nLanguage: " +
+                    (movieRes.Language) + "\nPlot: " + (movieRes.Plot) +
+                    "\nActors: " + (movieRes.Actors));
             });
         } else {
             movieSearch = "http://www.omdbapi.com/?t=" + movieChoice + "&apikey=40e9cece";
-            request(movieSearch, function (error, response, body) {
-                if (!error && response.statusCode === 200) {
-
-                    console.log("Title: " + (JSON.parse(body).Title) + "\nYear Released: " +
-                        (JSON.parse(body).Year) + "\nIMDB Rating: " + (JSON.parse(body).imdbRating) +
-                        "\nRotten Tomatoes Rating: " + (JSON.parse(body).Ratings[1].Value) +
-                        "\nCountry Produced: " + JSON.parse(body).Country + "\nLanguage: " +
-                        (JSON.parse(body).Language) + "\nPlot: " + (JSON.parse(body).Plot) +
-                        "\nActors: " + (JSON.parse(body).Actors));
-                } else {
-                    console.log('Error occurred: ' + error);
+            request(movieSearch, function (err, response, body) {
+                if (err || response.statusCode !== 200) {
+                    console.log("Error occurred: " + err);
                 }
+                movieRes = JSON.parse(body);
+                console.log("Title: " + (movieRes.Title) + "\nYear Released: " +
+                    (movieRes.Year) + "\nIMDB Rating: " + (movieRes.imdbRating) +
+                    "\nRotten Tomatoes Rating: " + (movieRes.Ratings[1].Value) +
+                    "\nCountry Produced: " + movieRes.Country + "\nLanguage: " +
+                    (movieRes.Language) + "\nPlot: " + (movieRes.Plot) +
+                    "\nActors: " + (movieRes.Actors));
             });
         }
     });
 }
 
-// do-what-it-says command
+// do-what-it-says liriCommand
+function doWhatItSays() {
+    console.log("Let's see what's happening in the 'random' file!");
 
-if (command == "do-what-it-says") {
-    fs.readFile('random.txt', 'utf-8', function (error, data) {
-        if (!error) {
-            var randomText = data.split(',');
-            var randomCommand = randomText[0];
-            var randomSong = randomText[1];
+    fs.readFile("random.txt", "utf-8", function (err, data) {
+        var randomText = data.split(",");
+        liriCommand = randomText[0];
 
-            if (randomCommand == "spotify-this-song") {
+        switch (liriCommand) {
+            case "my-tweets":
+            case "tweet":
+                myTweets();
+                break;
+
+            case "spotify-this-song":
+            case "spotify":
+                songChoice = randomText[1];
                 SpotifyAuth.search({
-                    type: 'track',
-                    query: randomSong,
+                    type: "track",
+                    query: songChoice,
                     limit: 1
-                }, function (error, data) {
-                    if (!error) {
-                        console.log("Artist(s): " + data.tracks.items[0].artists[0].name + "\nSong: " +
-                            data.tracks.items[0].name + "\nPreview: " + data.tracks.items[0].external_urls.spotify +
-                            "\nAlbum: " + data.tracks.items[0].album.name);
-                    } else {
-                        console.log('Error occurred: ' + error);
+                }, function (err, data) {
+                    if (err) {
+                        console.log("Error occurred: " + err);
                     }
+                    console.log("Artist(s): " + data.tracks.items[0].artists[0].name + "\nSong: " +
+                        data.tracks.items[0].name + "\nPreview: " + data.tracks.items[0].external_urls.spotify +
+                        "\nAlbum: " + data.tracks.items[0].album.name);
                 });
-            } else {
-                console.log("What do you want me to do here?..");
-            }
-        } else {
-            console.log('Error occurred: ' + error);
+                appendCommand();
+                break;
+
+            case "movie-this":
+            case "movie":
+                movieChoice = randomText[1];
+                console.log("movieChoice is " + movieChoice);
+                movieSearch = "http://www.omdbapi.com/?t=" + movieChoice + "&apikey=40e9cece";
+                request(movieSearch, function (err, response, body) {
+                    if (err || response.statusCode !== 200) {
+                        console.log("Error occurred: " + err);
+                    }
+                    movieRes = JSON.parse(body);
+                    console.log("Title: " + (movieRes.Title) + "\nYear Released: " +
+                        (movieRes.Year) + "\nIMDB Rating: " + (movieRes.imdbRating) +
+                        "\nRotten Tomatoes Rating: " + (movieRes.Ratings[1].Value) +
+                        "\nCountry Produced: " + movieRes.Country + "\nLanguage: " +
+                        (movieRes.Language) + "\nPlot: " + (movieRes.Plot) +
+                        "\nActors: " + (movieRes.Actors));
+                });
+                appendCommand();
+                break;
         }
+
     });
 }
